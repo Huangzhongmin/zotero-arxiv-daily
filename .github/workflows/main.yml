@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '0 8 * * *'
-
+      timezone: "Asia/Shanghai"
 jobs:
   calculate-and-send:
     runs-on: ubuntu-latest
