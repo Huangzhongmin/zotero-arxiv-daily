@@ -54,11 +54,14 @@ def get_empty_html():
   """
   return block_template
 
-def get_block_html(title:str, authors:str, rate:str, tldr:str, pdf_url:str | None, affiliations:str=None, link_label:str="PDF"):
+def get_block_html(title:str, authors:str, rate:str, tldr:str, pdf_url:str | None, affiliations:str=None, link_label:str="PDF", source_display:str | None=None):
     safe_url = safe_http_url(pdf_url)
     link_html = ""
     if safe_url:
         link_html = f'''<tr><td style="padding: 8px 0;"><a href="{escape(safe_url, quote=True)}" style="display: inline-block; text-decoration: none; font-size: 14px; font-weight: bold; color: #fff; background-color: #d9534f; padding: 8px 16px; border-radius: 4px;">{escape(link_label)}</a></td></tr>'''
+    source_html = ""
+    if source_display:
+        source_html = f'''<tr><td style="font-size: 14px; color: #666; padding: 4px 0;"><strong>来源：</strong> {escape(source_display)}</td></tr>'''
     block_template = """
     <table border="0" cellpadding="0" cellspacing="0" width="100%" style="font-family: Arial, sans-serif; border: 1px solid #ddd; border-radius: 8px; padding: 16px; background-color: #f9f9f9;">
     <tr>
@@ -66,6 +69,7 @@ def get_block_html(title:str, authors:str, rate:str, tldr:str, pdf_url:str | Non
             {title}
         </td>
     </tr>
+    {source_html}
     <tr>
         <td style="font-size: 14px; color: #666; padding: 8px 0;">
             {authors}
@@ -93,8 +97,24 @@ def get_block_html(title:str, authors:str, rate:str, tldr:str, pdf_url:str | Non
         rate=escape(str(rate)),
         tldr=escape(tldr or ""),
         affiliations=escape(affiliations or ""),
+        source_html=source_html,
         link_html=link_html,
     )
+
+
+def _paper_source_display(paper: Paper) -> str:
+    if paper.source_display and paper.source_display.strip():
+        return paper.source_display.strip()
+    defaults = {
+        "arxiv": "arXiv",
+        "biorxiv": "bioRxiv",
+        "medrxiv": "medRxiv",
+        "chemrxiv": "ChemRxiv",
+    }
+    source = (paper.source or "").strip()
+    if not source:
+        return "Unknown"
+    return defaults.get(source.casefold(), source.replace("_", " ").replace("-", " ").title())
 
 def get_stars(score:float):
     full_star = '<span class="full-star">⭐</span>'
@@ -139,7 +159,16 @@ def render_email(papers:list[Paper]) -> str:
         article_url = safe_http_url(p.url)
         button_url = pdf_url or article_url
         button_label = "PDF" if pdf_url else "Article"
-        parts.append(get_block_html(p.title, authors, rate, tldr, button_url, affiliations, button_label))
+        parts.append(get_block_html(
+            p.title,
+            authors,
+            rate,
+            tldr,
+            button_url,
+            affiliations,
+            button_label,
+            _paper_source_display(p),
+        ))
 
     content = '<br>' + '</br><br>'.join(parts) + '</br>'
     return framework.replace('__CONTENT__', content)

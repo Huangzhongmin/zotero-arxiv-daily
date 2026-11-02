@@ -28,6 +28,18 @@ HTML_TAG_PATTERN = re.compile(r"</?[a-z][^>]*>", re.IGNORECASE | re.DOTALL)
 HTML_SCRIPT_PATTERN = re.compile(r"<(script|style)\b[^>]*>.*?</\1\s*>", re.IGNORECASE | re.DOTALL)
 TRACKING_QUERY_KEYS = {"fbclid", "gclid"}
 NULL_VALUES = {"null", "none", "n/a", "na", "not available", "undefined"}
+KNOWN_JOURNAL_FEED_SOURCES = {
+    ("rss.sciencedirect.com", "/publication/science/09203796"): "Fusion Engineering and Design",
+    ("iopscience.iop.org", "/journal/rss/0029-5515"): "Nuclear Fusion",
+    ("iopscience.iop.org", "/journal/rss/0741-3335"): "Plasma Physics and Controlled Fusion",
+    ("ieeexplore.ieee.org", "/rss/toc23.xml"): "IEEE Transactions on Nuclear Science",
+    ("ieeexplore.ieee.org", "/rss/toc27.xml"): "IEEE Transactions on Plasma Science",
+}
+FEED_HOST_DISPLAY_NAMES = {
+    "rss.sciencedirect.com": "ScienceDirect",
+    "iopscience.iop.org": "IOPscience",
+    "ieeexplore.ieee.org": "IEEE Xplore",
+}
 METADATA_LABELS = (
     "author", "authors", "author(s)", "publication date", "date", "journal", "source",
     "volume", "issue", "pages", "article number", "doi", "keywords", "abstract",
@@ -43,6 +55,7 @@ class RSSRawPaper:
     pdf_url: str | None
     doi: str | None
     published: datetime | None
+    source_display: str | None = None
 
 
 def _plain_text(value: Any) -> str:
@@ -153,6 +166,44 @@ def _feed_kind(feed_url: str) -> str:
     if host == "iopscience.iop.org":
         return "iop"
     return "generic"
+
+
+def _known_journal_feed_source(feed_url: str) -> str | None:
+    parsed = urlsplit(feed_url)
+    host = (parsed.hostname or "").lower()
+    path = parsed.path.rstrip("/").casefold()
+    return KNOWN_JOURNAL_FEED_SOURCES.get((host, path))
+
+
+def _feed_source_display(feed_url: str) -> str:
+    if known_source := _known_journal_feed_source(feed_url):
+        return known_source
+    host = (urlsplit(feed_url).hostname or "").lower()
+    if host in FEED_HOST_DISPLAY_NAMES:
+        return FEED_HOST_DISPLAY_NAMES[host]
+    return host.removeprefix("www.") or "Unknown source"
+
+
+def _item_source_display(entry: Any) -> str:
+    publication_name = _meaningful_text(entry.get("prism_publicationname"))
+    if publication_name:
+        return publication_name
+    item_source = entry.get("source")
+    if isinstance(item_source, dict):
+        item_source = item_source.get("title")
+    return _meaningful_text(item_source)
+
+
+def _display_source(entry: Any, feed: Any, feed_url: str) -> str:
+    # Configured journal feeds have stable names that are more useful than
+    # inconsistent feed and item metadata. Other feeds use their own metadata.
+    if known_source := _known_journal_feed_source(feed_url):
+        return known_source
+    if item_source := _item_source_display(entry):
+        return item_source
+    feed_metadata = getattr(feed, "feed", {}) or {}
+    feed_title = _meaningful_text(feed_metadata.get("title", "")) if hasattr(feed_metadata, "get") else ""
+    return feed_title or _feed_source_display(feed_url)
 
 
 def _extract_labeled_field(value: Any, label: str) -> str:
@@ -478,6 +529,7 @@ class RSSRetriever(BaseRetriever):
                     pdf_url=pdf_url,
                     doi=doi,
                     published=published,
+                    source_display=_display_source(entry, feed, safe_feed_url),
                 )
                 papers.append(paper)
 
@@ -493,4 +545,5 @@ class RSSRetriever(BaseRetriever):
             abstract=raw_paper.abstract,
             url=raw_paper.url,
             pdf_url=raw_paper.pdf_url,
+            source_display=raw_paper.source_display,
         )
