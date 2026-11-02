@@ -105,6 +105,30 @@ executor:
   debug: ${oc.env:DEBUG,null}
   source: ['arxiv', 'rss']
 ```
+
+### 修改期刊订阅和每日推送篇数
+
+在 GitHub 仓库的 **Settings → Secrets and variables → Actions → Variables** 中编辑 `CUSTOM_CONFIG`。它对应 `config/custom.yaml`，默认继承 `config/base.yaml`。把下面内容合并到已有的 `source` 和 `executor` 节点；如果原配置已有这些节点，请合并字段，不要在同一层重复写 YAML 键：
+
+```yaml
+source:
+  rss:
+    journal_feeds:
+      - https://rss.sciencedirect.com/publication/science/09203796 # ScienceDirect
+      - https://iopscience.iop.org/journal/rss/0029-5515 # Nuclear Fusion
+      - https://iopscience.iop.org/journal/rss/0741-3335 # Plasma Physics and Controlled Fusion
+      - https://ieeexplore.ieee.org/rss/TOC23.XML # IEEE Transactions on Nuclear Science
+      - https://ieeexplore.ieee.org/rss/TOC27.XML # IEEE Transactions on Plasma Science
+
+executor:
+  source: ['arxiv', 'rss']
+  max_paper_num: 8
+  journal_paper_bonus: 2
+```
+
+`journal_feeds` 会整体替换默认期刊名单；普通 RSS/Atom 地址仍放在 `source.rss.feeds`，按最近 24 小时筛选，也不计入期刊加篇数。每个有新文章的期刊源每次运行只加一次篇数；arXiv 与期刊论文一起排序。默认基础篇数为 8，每个有新文章的期刊源加 2 篇，因此两个期刊源有新文章时最多推送 12 篇。
+
+```
 Generic RSS/Atom feeds keep the 24-hour publication-date filter. Add your feed URLs under `source.rss.feeds`:
 ```yaml
 source:
