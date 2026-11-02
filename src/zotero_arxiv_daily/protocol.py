@@ -84,7 +84,11 @@ class Paper:
         )
         return tldr
     
-    def generate_tldr(self, openai_client:OpenAI,llm_params:dict) -> str:
+    def generate_tldr(self, openai_client:OpenAI,llm_params:dict) -> str | None:
+        if self.source == "rss" and not self.full_text and not self.abstract:
+            logger.info(f"Skipping TLDR for title-only RSS item {self.url}")
+            self.tldr = None
+            return None
         try:
             tldr = self._generate_tldr_with_llm(openai_client,llm_params)
             self.tldr = tldr

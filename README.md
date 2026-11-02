@@ -45,6 +45,7 @@
   - biorxiv
   - medrxiv
   - chemrxiv
+  - generic RSS/Atom feeds
 
 ## 📷 Screenshot
 ![screenshot](./assets/screenshot.png)
@@ -103,6 +104,16 @@ executor:
   debug: ${oc.env:DEBUG,null}
   source: ['arxiv']
 ```
+To opt in to generic RSS/Atom feeds, add your actual feed URLs and enable `rss` in `executor.source`:
+```yaml
+source:
+  rss:
+    feeds: [] # Add one or more actual RSS/Atom feed URLs.
+
+executor:
+  source: ['arxiv', 'rss']
+```
+The RSS retriever accepts RSS or Atom feeds and considers entries published (or, if missing, updated) within the previous 24 hours. Entries without either date are skipped and logged.
 Set `source.arxiv.include_cross_list: true` if you want cross-listed papers included.
 >[!NOTE]
 > `${oc.env:XXX,yyy}` means the value of the environment variable `XXX`. If the variable is not set, the default value `yyy` will be used.
@@ -124,6 +135,8 @@ source:
     category: null # The categories of target medrxiv papers. Find categories from [here](https://www.medrxiv.org/) Example: ["psychiatry and clinical psychology", "neurology"]
   chemrxiv:
     include_new_versions: false # Whether to include revised versions (v2, v3, ...) of previously posted chemrxiv preprints in addition to new first postings. chemrxiv has no category filter: all new preprints (a few dozen per day) are retrieved via Crossref and left to the reranker. Example: true
+  rss:
+    feeds: [] # List of RSS/Atom URLs; add 'rss' to executor.source to enable them.
 
 email:
   sender: ??? # The email account of the SMTP server that sends you email. Example: abc@qq.com
@@ -160,7 +173,7 @@ executor:
   debug: false # Whether to use debug mode. Example: true
   send_empty: false # Whether to send an empty email even if no new papers today. Example: true
   max_paper_num: 100 # The maximum number of the papers presented in the email. Example: 100
-  source: ??? # The sources of papers to retrieve. Example: ['arxiv','biorxiv','medrxiv','chemrxiv']
+  source: ??? # The sources of papers to retrieve. Example: ['arxiv','biorxiv','medrxiv','chemrxiv','rss']
   reranker: local # The reranker to use. Example: 'local' or 'api'
 ```
 
