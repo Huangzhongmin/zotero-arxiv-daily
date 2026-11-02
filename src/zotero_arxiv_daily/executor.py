@@ -39,6 +39,13 @@ class Executor:
         }
         self.reranker = get_reranker_cls(config.executor.reranker)(config)
         self.openai_client = OpenAI(api_key=config.llm.api.key, base_url=config.llm.api.base_url)
+
+    def commit_retriever_state(self):
+        for retriever in self.retrievers.values():
+            commit_state = getattr(retriever, "commit_history", None)
+            if commit_state:
+                commit_state()
+
     def fetch_zotero_corpus(self) -> list[CorpusPaper]:
         logger.info("Fetching zotero corpus")
         zot = zotero.Zotero(self.config.zotero.user_id, 'user', self.config.zotero.api_key)
@@ -110,15 +117,26 @@ class Executor:
         if len(all_papers) > 0:
             logger.info("Reranking papers...")
             reranked_papers = self.reranker.rerank(all_papers, corpus)
-            reranked_papers = reranked_papers[:self.config.executor.max_paper_num]
+            rss_retriever = self.retrievers.get("rss")
+            updated_journal_count = len(getattr(rss_retriever, "updated_journal_feeds", set()))
+            base_limit = int(self.config.executor.max_paper_num)
+            journal_bonus = int(self.config.executor.get("journal_paper_bonus", 2))
+            paper_limit = base_limit + journal_bonus * updated_journal_count
+            reranked_papers = reranked_papers[:paper_limit]
+            logger.info(
+                f"Selecting up to {paper_limit} papers "
+                f"({base_limit} base + {updated_journal_count} updated journals × {journal_bonus})"
+            )
             logger.info("Generating TLDR and affiliations...")
             for p in tqdm(reranked_papers):
                 p.generate_tldr(self.openai_client, self.config.llm)
                 p.generate_affiliations(self.openai_client, self.config.llm)
         elif not self.config.executor.send_empty:
             logger.info("No new papers found. No email will be sent.")
+            self.commit_retriever_state()
             return
         logger.info("Sending email...")
         email_content = render_email(reranked_papers)
         send_email(self.config, email_content)
         logger.info("Email sent successfully")
+        self.commit_retriever_state()

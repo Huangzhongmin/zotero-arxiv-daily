@@ -7,6 +7,9 @@ on:
 jobs:
   calculate-and-send:
     runs-on: ubuntu-latest
+    concurrency:
+      group: rss-history-${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: false
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -16,6 +19,14 @@ jobs:
 
       - name: Setup uv
         uses: astral-sh/setup-uv@v7
+
+      - name: Restore RSS seen history
+        uses: actions/cache/restore@v4
+        with:
+          path: .cache/rss_seen.json
+          key: rss-seen-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            rss-seen-v1-
 
       - name: Run script
         env:
@@ -33,3 +44,10 @@ jobs:
           echo "Use custom config: "
           cat config/custom.yaml
           uv run src/zotero_arxiv_daily/main.py
+
+      - name: Save RSS seen history
+        if: success() && hashFiles('.cache/rss_seen.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .cache/rss_seen.json
+          key: rss-seen-v1-${{ github.run_id }}-${{ github.run_attempt }}

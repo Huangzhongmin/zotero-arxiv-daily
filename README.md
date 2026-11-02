@@ -46,6 +46,7 @@
   - medrxiv
   - chemrxiv
   - generic RSS/Atom feeds
+  - five default journal RSS feeds (ScienceDirect, IOP, and IEEE)
 
 ## 📷 Screenshot
 ![screenshot](./assets/screenshot.png)
@@ -102,18 +103,28 @@ source:
 
 executor:
   debug: ${oc.env:DEBUG,null}
-  source: ['arxiv']
+  source: ['arxiv', 'rss']
 ```
-To opt in to generic RSS/Atom feeds, add your actual feed URLs and enable `rss` in `executor.source`:
+Generic RSS/Atom feeds keep the 24-hour publication-date filter. Add your feed URLs under `source.rss.feeds`:
 ```yaml
 source:
   rss:
-    feeds: [] # Add one or more actual RSS/Atom feed URLs.
-
-executor:
-  source: ['arxiv', 'rss']
+    feeds:
+      - https://example.org/my-feed.xml
 ```
-The RSS retriever accepts RSS or Atom feeds and considers entries published (or, if missing, updated) within the previous 24 hours. Entries without either date are skipped and logged.
+The normal workflow also enables these five journal feeds by default, together with arXiv:
+
+- ScienceDirect: `https://rss.sciencedirect.com/publication/science/09203796`
+- Nuclear Fusion: `https://iopscience.iop.org/journal/rss/0029-5515`
+- Plasma Physics and Controlled Fusion: `https://iopscience.iop.org/journal/rss/0741-3335`
+- IEEE Transactions on Nuclear Science: `https://ieeexplore.ieee.org/rss/TOC23.XML`
+- IEEE Transactions on Plasma Science: `https://ieeexplore.ieee.org/rss/TOC27.XML`
+
+The first successful read of each journal feed establishes its baseline and does not send its older articles. Later runs consider entries new when their stable feed ID, DOI, or article URL has not appeared before; journal dates do not determine whether an entry is new. The seen history is saved locally in `.cache/rss_seen.json` and carried between Main workflow runs with Actions cache. Scheduled and manually dispatched Main runs save updated history after success. The separate debug Test workflow skips journal feeds and never changes this history.
+
+arXiv and all newly seen journal papers are ranked together. By default, the email contains up to 8 papers, plus 2 for each distinct journal feed that returned at least one new article. Set `executor.max_paper_num` to change the base count and `executor.journal_paper_bonus` to change the per-feed addition. IEEE table-of-contents/front-matter entries are ignored. Journal entries without abstracts are ranked using their title.
+
+`source.rss.feeds` remains available for your own generic feeds and keeps the 24-hour rule: entries published (or, if missing, updated) within the previous 24 hours are considered; entries without either date are skipped. The default `executor.source` is `['arxiv', 'rss']`. Existing `CUSTOM_CONFIG` values override YAML defaults, including this list: update an existing value from `['arxiv']` to `['arxiv', 'rss']` to enable the five journal feeds. Other configured sources can remain in the list. Setting `source.rss.journal_feeds` replaces the five default URLs.
 Set `source.arxiv.include_cross_list: true` if you want cross-listed papers included.
 >[!NOTE]
 > `${oc.env:XXX,yyy}` means the value of the environment variable `XXX`. If the variable is not set, the default value `yyy` will be used.
@@ -136,7 +147,13 @@ source:
   chemrxiv:
     include_new_versions: false # Whether to include revised versions (v2, v3, ...) of previously posted chemrxiv preprints in addition to new first postings. chemrxiv has no category filter: all new preprints (a few dozen per day) are retrieved via Crossref and left to the reranker. Example: true
   rss:
-    feeds: [] # List of RSS/Atom URLs; add 'rss' to executor.source to enable them.
+    feeds: [] # Generic RSS/Atom URLs; these keep the 24-hour date filter.
+    journal_feeds: # Journal feeds are enabled by default in normal runs.
+      - https://rss.sciencedirect.com/publication/science/09203796
+      - https://iopscience.iop.org/journal/rss/0029-5515
+      - https://iopscience.iop.org/journal/rss/0741-3335
+      - https://ieeexplore.ieee.org/rss/TOC23.XML
+      - https://ieeexplore.ieee.org/rss/TOC27.XML
 
 email:
   sender: ??? # The email account of the SMTP server that sends you email. Example: abc@qq.com
@@ -172,8 +189,9 @@ reranker:
 executor:
   debug: false # Whether to use debug mode. Example: true
   send_empty: false # Whether to send an empty email even if no new papers today. Example: true
-  max_paper_num: 100 # The maximum number of the papers presented in the email. Example: 100
-  source: ??? # The sources of papers to retrieve. Example: ['arxiv','biorxiv','medrxiv','chemrxiv','rss']
+  max_paper_num: 8 # Base maximum before journal update additions.
+  journal_paper_bonus: 2 # Additional papers per journal feed with new articles.
+  source: ['arxiv', 'rss'] # Add other retrievers here if needed.
   reranker: local # The reranker to use. Example: 'local' or 'api'
 ```
 

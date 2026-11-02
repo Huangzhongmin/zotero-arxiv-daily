@@ -24,4 +24,4 @@ source:
 
 executor:
   debug: ${oc.env:DEBUG,null}
-  source: ['arxiv']
+  source: ['arxiv', 'rss']
