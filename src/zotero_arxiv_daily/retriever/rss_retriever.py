@@ -546,4 +546,5 @@ class RSSRetriever(BaseRetriever):
             url=raw_paper.url,
             pdf_url=raw_paper.pdf_url,
             source_display=raw_paper.source_display,
+            doi=raw_paper.doi,
         )

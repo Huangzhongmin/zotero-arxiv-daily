@@ -2,6 +2,7 @@ from loguru import logger
 from pyzotero import zotero
 from omegaconf import DictConfig, ListConfig
 from .utils import glob_match
+from .abstract_enrichment import enrich_missing_abstracts
 from .retriever import get_retriever_cls
 from .protocol import CorpusPaper
 import random
@@ -113,6 +114,9 @@ class Executor:
             logger.info(f"Retrieved {len(papers)} {source} papers")
             all_papers.extend(papers)
         logger.info(f"Total {len(all_papers)} papers retrieved from all sources")
+        if all_papers:
+            logger.info("Retrieving missing abstracts before relevance ranking...")
+            enrich_missing_abstracts(all_papers)
         reranked_papers = []
         if len(all_papers) > 0:
             logger.info("Reranking papers...")

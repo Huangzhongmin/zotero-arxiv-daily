@@ -148,4 +148,5 @@ class ChemrxivRetriever(BaseRetriever):
             url=url,
             pdf_url=pdf_url,
             full_text=full_text,
+            doi=doi,
         )

@@ -54,7 +54,7 @@ def get_empty_html():
   """
   return block_template
 
-def get_block_html(title:str, authors:str, rate:str, tldr:str, pdf_url:str | None, affiliations:str=None, link_label:str="PDF", source_display:str | None=None):
+def get_block_html(title:str, authors:str, rate:str, tldr:str, pdf_url:str | None, affiliations:str=None, link_label:str="PDF", source_display:str | None=None, abstract_note:str | None=None):
     safe_url = safe_http_url(pdf_url)
     link_html = ""
     if safe_url:
@@ -62,6 +62,9 @@ def get_block_html(title:str, authors:str, rate:str, tldr:str, pdf_url:str | Non
     source_html = ""
     if source_display:
         source_html = f'''<tr><td style="font-size: 14px; color: #666; padding: 4px 0;"><strong>来源：</strong> {escape(source_display)}</td></tr>'''
+    abstract_html = ""
+    if abstract_note:
+        abstract_html = f'''<tr><td style="font-size: 14px; color: #666; padding: 4px 0;"><strong>摘要：</strong> {escape(abstract_note)}</td></tr>'''
     block_template = """
     <table border="0" cellpadding="0" cellspacing="0" width="100%" style="font-family: Arial, sans-serif; border: 1px solid #ddd; border-radius: 8px; padding: 16px; background-color: #f9f9f9;">
     <tr>
@@ -82,6 +85,7 @@ def get_block_html(title:str, authors:str, rate:str, tldr:str, pdf_url:str | Non
             <strong>Relevance:</strong> {rate}
         </td>
     </tr>
+    {abstract_html}
     <tr>
         <td style="font-size: 14px; color: #333; padding: 8px 0;">
             <strong>TLDR:</strong> {tldr}
@@ -98,6 +102,7 @@ def get_block_html(title:str, authors:str, rate:str, tldr:str, pdf_url:str | Non
         tldr=escape(tldr or ""),
         affiliations=escape(affiliations or ""),
         source_html=source_html,
+        abstract_html=abstract_html,
         link_html=link_html,
     )
 
@@ -154,7 +159,18 @@ def render_email(papers:list[Paper]) -> str:
                 affiliations += ', ...'
         else:
             affiliations = 'Unknown Affiliation'
-        tldr = p.tldr or p.abstract or "No abstract available; open the article for details."
+        if (p.source or "").casefold() == "arxiv":
+            tldr = p.tldr or p.abstract or "No abstract available; open the article for details."
+            abstract_note = None
+        else:
+            abstract_available = bool((p.abstract or "").strip())
+            tldr = p.tldr or p.abstract or ""
+            abstract_note = None
+            if not abstract_available:
+                if tldr:
+                    abstract_note = "未获取到摘要"
+                else:
+                    tldr = "未获取到摘要"
         pdf_url = safe_http_url(p.pdf_url)
         article_url = safe_http_url(p.url)
         button_url = pdf_url or article_url
@@ -168,6 +184,7 @@ def render_email(papers:list[Paper]) -> str:
             affiliations,
             button_label,
             _paper_source_display(p),
+            abstract_note,
         ))
 
     content = '<br>' + '</br><br>'.join(parts) + '</br>'
